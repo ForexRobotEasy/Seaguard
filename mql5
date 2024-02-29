@@ -1,0 +1,75 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                                 Seaguard.mq5 |
+//|                        Copyright 2022, Forex Robot Easy Team   |
+//|                          https://www.forexroboteasy.com           |
+//+------------------------------------------------------------------+
+
+// Define input parameters
+input double RiskPercentage = 2.0; // Risk percentage per trade
+
+// Define global variables
+int ticket = 0; // Order ticket number
+
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // Set trading parameters
+   SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE, 0.01); // Set contract size to 0.01 for micro ES contracts
+   
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   // Close any open orders before shutting down the expert advisor
+   if(ticket > 0)
+   {
+      OrderClose(ticket, OrderLots(), MarketInfo(OrderSymbol(), MODE_BID), 0);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   // Check if there are any open positions
+   if(PositionsTotal() == 0)
+   {
+      // Calculate position size based on risk percentage
+      double riskAmount = AccountBalance() * RiskPercentage / 100;
+      double lotSize = NormalizeDouble(riskAmount / (SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE) * SymbolInfoDouble(_Symbol, SYMBOL_TICK_VALUE)), 2);
+      
+      // Calculate stop loss and take profit levels
+      double stopLoss = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - 100 * SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      double takeProfit = SymbolInfoDouble(_Symbol, SYMBOL_ASK) + 200 * SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+      
+      // Open a long position
+      ticket = OrderSend(_Symbol, OP_BUY, lotSize, SymbolInfoDouble(_Symbol, SYMBOL_ASK), 3, stopLoss, takeProfit, 'Seaguard', MagicNumber(), 0, clrGreen);
+   }
+   else
+   {
+      // Check if the current position is profitable
+      double profit = PositionGetDouble(POSITION_PROFIT);
+      if(profit > 100 * SymbolInfoDouble(_Symbol, SYMBOL_POINT))
+      {
+         // Set a trailing stop to protect profits
+         double trailingStop = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - 50 * SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+         OrderModify(ticket, 0, trailingStop, 0, 0, clrGreen);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Custom functions                                                 |
+//+------------------------------------------------------------------+
+int MagicNumber()
+{
+   return 1234; // Replace with your own magic number
+}
